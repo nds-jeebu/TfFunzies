@@ -15,3 +15,12 @@ class Memory:
                                size=batch_size,
                                replace=False)
         return [self.buffer[ii] for ii in idx]
+
+# tester = Memory(5)
+# tester.add([1])
+# tester.add([14])
+# tester.add([3])
+# tester.add([2])
+# tester.add([1])
+#
+# print(tester.sample(3))

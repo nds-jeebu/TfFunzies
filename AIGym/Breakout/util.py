@@ -9,7 +9,7 @@ class Util:
     def preprocess_frame(frame):
         # Convert to grayscale and downscale
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        img = cv2.resize(img, (110, 84))
+        #img = cv2.resize(img, (110, 84))
         return img/255.
 
     @staticmethod
