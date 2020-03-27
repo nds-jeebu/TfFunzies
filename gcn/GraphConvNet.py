@@ -13,6 +13,10 @@ class GraphConvNet(layers.Layer):
         super(GraphConvNet, self).__init__()
         self.adjacency_mat = A
         self.graph_info = layer_info_list
+        self.lay_lst = []
+        for cnfg in layer_info_list:
+            num_feats_per_node, activation = cnfg
+            self.lay_lst.append(Spectral(self.adjacency_mat, num_feats_per_node, activation))
 
     def build(self, input_shape):
         shp = self.graph_info[-1][0]
@@ -26,10 +30,8 @@ class GraphConvNet(layers.Layer):
     def call(self, inputs):
         # loop through the list and build
         x = inputs
-        for cnfg in self.graph_info:
-            num_feats_per_node, activation = cnfg
-            x = Spectral(self.adjacency_mat, num_feats_per_node, activation)(x)
-
+        for i in range(len(self.lay_lst)):
+            x = self.lay_lst[i](x)
         # now, sum over the features per node and sigmoid
         x = tf.linalg.matmul(x, self.w)
         x = tf.transpose(x) + self.b
@@ -46,25 +48,64 @@ A = np.asmatrix([[0, 1, 0, 0],
 A_hat = np.eye(A.shape[0])
 A_hat += A
 
-x = np.asmatrix([[0, 0],
-                 [1, -1],
-                 [2, -2],
-                 [3, -3]])
+x = np.asmatrix([[0., 0.],
+                 [1., -1.],
+                 [2., -2.],
+                 [3., -3.]])
 
 A_hat = tf.constant(A_hat, dtype=tf.float32)
-x = tf.constant(x, dtype=tf.float32)
-msk = tf.constant([False, True, True, True])
-#msk = None
+feat = tf.constant(x, dtype=tf.float32)
+# msk = tf.constant([False, True, True, True])
+# #msk = None
 info_lst = [(10, 'tanh'), (10, 'tanh')]
-g = GraphConvNet(A_hat, info_lst)
+#g = GraphConvNet(A_hat, info_lst)
+#
+#res = g(feat)
+# lss = tf.keras.losses.BinaryCrossentropy()
+# # lss(tf.constant([1., 2.]), tf.constant([1., 3.]), sample_weight=tf.constant([2,2]))
+# print(res)
+#print(tf.keras.backend.gather(res, [0,3]))
 
-res = g(x)
-lss = tf.keras.losses.BinaryCrossentropy()
-# lss(tf.constant([1., 2.]), tf.constant([1., 3.]), sample_weight=tf.constant([2,2]))
-print(res)
-wts = tf.constant([[0., 1., 1., 1.]])
-print(wts.shape)
-print(lss(tf.constant([1., 0., 0., 0.]), res, sample_weight=[0., 1., 1., 1.]))
+#print(lss(, [0., 1.]))
+# wts = tf.constant([[0., 1., 1., 1.]])
+# print(wts.shape)
+# print(lss(tf.constant([1., 0., 0., 0.]), res, sample_weight=[0., 1., 1., 1.]))
+class MyModel(tf.keras.Model):
+    def __init__(self, A_init, opt_list):
+        super(MyModel, self).__init__()
+        self.gcn = GraphConvNet(A_init, opt_list)
 
-# a loss boi
-bce = tf.keras.losses.BinaryCrossentropy()
+    def call(self, inputs, training=None, mask=None):
+        k = self.gcn(inputs)
+        k = tf.keras.backend.gather(k, [0,3])
+        return k
+
+model = MyModel(A_hat, info_lst)
+# inputs = tf.keras.Input(shape=(4,2))
+# k = GraphConvNet(A_hat, info_lst)(inputs)
+# outputs = tf.keras.backend.gather(k, [0,3])
+#
+# model = tf.keras.Model(inputs=inputs, outputs=outputs)
+model = MyModel(A_hat, info_lst)
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(),
+    loss=tf.keras.losses.BinaryCrossentropy()
+)
+
+y_t = tf.constant([0.,1.])
+for i in range(2000):
+    model.train_on_batch(x=feat, y=y_t)
+
+print(model.predict_on_batch(x))
+# inputs = tf.keras.Input(shape=(4,2), name='feats')
+# x = GraphConvNet(A_hat, info_lst)(inputs)
+# outputs = tf.keras.backend.gather(x, [0,3])
+#
+# model = tf.keras.Model()
+# model.
+#
+# model.compile(optimizer='adam',
+#               loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
+#               metrics=['accuracy'])
+#
+# test_loss, test_acc = model.evaluate(np.array([feat]),  np.array([[0.,0.]]), verbose=2)
