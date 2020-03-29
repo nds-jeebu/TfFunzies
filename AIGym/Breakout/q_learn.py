@@ -24,5 +24,5 @@ model_save_path = 'model/'
 
 learner = SmartAgent(FRAME_STACK_SIZE, MAX_MEMORY_SIZE, model_save_path)
 learner.setup_DQN(True, model_save_path)
-
-learner.gather_experience(1000)
+learner.test_policy()
+#learner.gather_experience(100000)
