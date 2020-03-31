@@ -26,7 +26,13 @@ class DQNModel:
         self.target_model = self.build_based_model()
 
     def update_target_model(self):
-        self.target_model.set_weights(self.prediction_model.get_weights())
+        wts_pred = self.prediction_model.get_weights()
+        wts_targ = self.target_model.get_weights()
+
+        for i in range(len(wts_pred)):
+            wts_targ[i] = wts_targ[i] * .95 + wts_pred[i] * .05
+
+        self.target_model.set_weights(wts_targ)
 
     def build_based_model(self):
         model = tf.keras.models.Sequential()
@@ -43,7 +49,7 @@ class DQNModel:
     def restore_model(self, model_path):
         self.prediction_model = tf.keras.models.load_model(model_path)
         self.target_model = self.build_based_model()
-        self.update_target_model()
+        self.target_model.set_weights(self.prediction_model.get_weights())
 
     def process_mem_block(self, mem_block, discount):
         train_input_batch = []
@@ -52,15 +58,23 @@ class DQNModel:
             # The input will be the frame_stack
             train_input_batch.append(state)
             # Determine if state was terminal
-            future_disc_reward = 0
+            target_q_value = 0
+            state = np.array([state])
             if not is_term:
                 next_state = np.array([next_state])
-                intermed_q_vals = np.array(self.target_model.predict_on_batch(next_state))
-                future_disc_reward = discount * np.max(intermed_q_vals[0])
-            expected_q = reward + future_disc_reward
+
+                # For double DQN, we need to update this section
+                #intermed_q_vals = np.array(self.target_model.predict_on_batch(next_state))
+                #future_disc_reward = discount * np.max(intermed_q_vals[0])
+                target_net_action = np.array(self.target_model.predict_on_batch(state))[0]
+                target_net_action = np.argmax(target_net_action)
+                target_q_value = np.array(self.prediction_model.predict_on_batch(next_state))[0]
+                target_q_value = target_q_value[target_net_action]
+
+            expected_q = reward + discount * target_q_value
 
             # Now, we want to set it equal to the associated target q value
-            state = np.array([state])
+            #state = np.array([state])
             target = np.array(self.prediction_model.predict_on_batch(state))[0]
             target[action] = expected_q
             train_targ_batch.append(target)

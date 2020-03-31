@@ -11,7 +11,7 @@ class SmartAgent:
         self.env = gym.make('BreakoutDeterministic-v4')
         self.memory = Memory(max_memory_size)
         self.frame_stack_size = stack_size
-        self.explore_prob = .01
+        self.explore_prob = .08
         self.explore_prob_final = 0.01
         self.explore_decay = .995
         self.DQN = DQNModel(self.env.action_space.n, stack_size)
@@ -32,10 +32,10 @@ class SmartAgent:
         self.DQN.train(mem_block, self.discount, num_epochs)
         if self.num_exps % 1000 == 0:
             self.DQN.save_model_params(self.model_save_path)
-        if update_target:
-            self.DQN.update_target_model()
+
+        self.DQN.update_target_model()
         if self.explore_prob > self.explore_prob_final:
-            self.explore_prob -= (1 - .01)/1e5
+            self.explore_prob *= 0.9999
 
     def test_policy(self):
         is_new_episode = True
@@ -91,7 +91,7 @@ class SmartAgent:
                 #print(reward)
                 #plt.imshow(frame)
                 #plt.show()
-                #self.env.render()
+                self.env.render()
                 next_state, frame_stack = Util.stack_frames(frame_stack, self.frame_stack_size, frame, is_new_episode)
                 # for i in range(4):
                 #     plt.imshow(next_state[:, :, i])
@@ -101,12 +101,10 @@ class SmartAgent:
                 self.memory.add(experience)
                 self.num_exps += 1
 
-                if self.num_exps >= 50000:
+                if self.num_exps >= 100:
                     if (self.num_exps - 200) % 4 == 0:
-                        if (self.num_exps - 200) % 8 == 0:
-                            self.train(32, 1, True)
-                        else:
-                            self.train(32, 1, False)
+                        self.train(32, 1, True)
+
                 #print('Explore Prob:', self.explore_prob)
 
 

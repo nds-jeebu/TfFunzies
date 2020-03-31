@@ -5,8 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from IPython import display
 
-from src.load_mnist import load_mnist
+from load_mnist import load_mnist
 
+# logarithm of the normal distribution, taken over batches
 def log_normal_pdf(sample, mean, logvar, raxis=1):
     log2pi = tf.math.log(2. * np.pi)
     return tf.reduce_sum(
@@ -21,10 +22,16 @@ def compute_loss(model, x):
     z = model.reparameterize(mean, logvar)
     x_logit = model.decode(z)
 
+    # The ONLY reason why cross entropy works here is because we normalized
     cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=x)
+    # The reconstruction error
     logpx_z = -tf.reduce_sum(cross_ent, axis=[1,2,3])
+    # The log pdf of the standard normal distrib evaluated at z
     logpz = log_normal_pdf(z, 0., 0.)
+    # The log pdf of the encoder distrib evaluated at z
     logqz_x = log_normal_pdf(z, mean, logvar)
+
+    # The below sum is a Monte Carlo estimate for the ELBO
     return -tf.reduce_mean(logpx_z + logpz - logqz_x)
 
 
@@ -32,6 +39,7 @@ def compute_loss(model, x):
 def compute_apply_gradients(model, x, optimizer):
     with tf.GradientTape() as tape:
         loss = compute_loss(model, x)
+    # Simply copmute the gradient of the loss w.r.t. model variables and apply to optimizer
     gradients = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
@@ -47,7 +55,7 @@ def generate_and_save_images(model, epoch, test_input):
 
         # tight_layout minimizes the overlap between 2 sub-plots
     plt.savefig('image_at_epoch_{:04d}.png'.format(epoch))
-    plt.show()
+    #plt.show()
 
 
 class CVAE(tf.keras.Model):
@@ -120,21 +128,34 @@ class CVAE(tf.keras.Model):
         return logits
 
 
+# Number of dimensions to embed the inputs in
 latent_dim = 50
+
+# Number of epochs to train
 epochs = 100
+
+# Number of demo images to produce
 num_ex_to_gen = 16
 
+# Load the MNIST dataset
 train_dataset, test_dataset = load_mnist()
 
+# Create a set of codes in the latent deminsion to sample for visulaization
 random_vector_for_generation = tf.random.normal(
     shape=[num_ex_to_gen, latent_dim])
 
+# Create the model, initializing with latent dimension
 model = CVAE(latent_dim)
+
+# Setting up training
+#####################
 
 optimizer = tf.keras.optimizers.Adam(1e-4)
 
+# Save initial result from generating images
 generate_and_save_images(model, 0, random_vector_for_generation)
 
+# Do training step here
 for epoch in range(1, epochs+1):
     start_time = time.time()
     for train_x in train_dataset:
